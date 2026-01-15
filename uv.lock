@@ -1588,6 +1588,11 @@ modal = [
     { name = "modal" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "boto3", marker = "extra == 'modal'" },
@@ -1627,6 +1632,9 @@ requires-dist = [
     { name = "typer" },
 ]
 provides-extras = ["full", "modal", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-asyncio", specifier = ">=1.3.0" }]
 
 [[package]]
 name = "mkdocs"
