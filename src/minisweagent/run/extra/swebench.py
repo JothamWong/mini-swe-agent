@@ -85,6 +85,10 @@ def get_sb_environment(config: dict, instance: dict) -> Environment:
         env_config["image"] = image_name
     elif env_config["environment_class"] == "singularity":
         env_config["image"] = "docker://" + image_name
+    elif env_config["environment_class"] == "trenvx":
+        # env_config["template"] = None
+        # TODO: This might be where the template manager from trenvx shud be called
+        pass
     env = get_environment(env_config)
     if startup_command := config.get("run", {}).get("env_startup_command"):
         startup_command = Template(startup_command, undefined=StrictUndefined).render(**instance)
