@@ -1,0 +1,3 @@
+[submodule "trenv-x"]
+	path = trenv-x
+	url = https://github.com/JothamWong/TrEnv-X.git
