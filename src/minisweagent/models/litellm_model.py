@@ -18,6 +18,10 @@ from tenacity import (
 from minisweagent.models import GLOBAL_MODEL_STATS
 from minisweagent.models.utils.cache_control import set_cache_control
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+
 logger = logging.getLogger("litellm_model")
 
 
