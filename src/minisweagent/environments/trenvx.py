@@ -5,6 +5,8 @@ from typing import Any
 from pydantic import BaseModel
 from sandbox_sdk import Sandbox
 
+from minisweagent.environments.trenv_config import *
+
 
 class TrenvxEnvironmentConfig(BaseModel):
     """
@@ -12,11 +14,24 @@ class TrenvxEnvironmentConfig(BaseModel):
     NOTE: The API for the creation of sandbox does include hooks as well.
     """
 
-    template: str
-    """Trenvx template."""
+    # Parameters for the creation of the template
+    image: str
+    """Docker image to pull"""
+    template_id: str
+    """Trenvx template id name."""
+    vcpu: int = 1
+    mem_mb: int = 2048
+    disk_mb: int = 4096
+    vmm_type: str = "firecracker"
+    kernel_version: str = "fc-6.1.134"
+    no_pull: bool = False
+    huge_pages: bool = False
+    overlay: bool = False
+    start_cmd: dict[str, str] | None = None
+    # Parameters for the creation of the sandbox
     cwd: str | None = None
     """Current working directory to use"""
-    target_addr: str
+    target_addr: str = "127.0.0.1"
     """IP address of where the trenvx backend is running."""
     env: dict[str, str] = {}
     """Environment variables to forward to container"""
@@ -49,14 +64,35 @@ class TrenvxEnvironment:
         self.logger = logger or logging.getLogger("minisweagent.environment")
         self.config = config_class(**kwargs)
         self._ev_loop = asyncio.new_event_loop()
+        self._build_template()
         self._setup_container()
 
+    def _build_template(self):
+        self.logger.info(f"Building the template {self.config.template_id} using the template-manager")
+        config = load_trenvx_template()
+        config = add_trenvx_template(
+            config=config,
+            template_id=self.config.template_id,
+            docker_img=self.config.image,
+            vcpu=self.config.vcpu,
+            mem_mb=self.config.mem_mb,
+            disk_mb=self.config.disk_mb,
+            vmm_type=self.config.vmm_type,
+            kernel_version=self.config.kernel_version,
+            no_pull=self.config.no_pull,
+            huge_pages=self.config.huge_pages,
+            overlay=self.config.overlay,
+            start_cmd=self.config.start_cmd,
+        )
+        config = change_target_template(config=config, template_id=self.config.template_id)
+        build_template(config, self.config.template_id)
+        self.logger.info(f"Built the template {self.config.template_id}")
+
     def _setup_container(self):
-        # TODO: In the future actually make the template too?
-        self.logger.info(f"Setting up Trenvx sandbox with template {self.config.template}")
+        self.logger.info(f"Setting up Trenvx sandbox with template {self.config.template_id}")
         self.ci = self._ev_loop.run_until_complete(
             Sandbox.create(
-                template=self.config.template,
+                template=self.config.template_id,
                 cwd=self.config.cwd,
                 target_addr=self.config.target_addr,
                 env_vars=self.config.env,
@@ -86,11 +122,15 @@ class TrenvxEnvironment:
 
     def cleanup(self):
         self.logger.info("Cleaning up")
+        if not hasattr(self, "_ev_loop"):
+            return
+        if not hasattr(self, "ci"):
+            return
         self._ev_loop.run_until_complete(self.ci.close())
         self._ev_loop.close()
         self.logger.info("Cleaned up trenvx and evloop successfully")
 
     def __del__(self):
         # Prevent double close from Python's GC
-        if not self._ev_loop.is_closed():
+        if hasattr(self, "_ev_loop") and not self._ev_loop.is_closed():
             self.cleanup()
