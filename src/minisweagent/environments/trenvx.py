@@ -2,47 +2,9 @@ import asyncio
 import logging
 from typing import Any
 
-from pydantic import BaseModel
 from sandbox_sdk import Sandbox
 
 from minisweagent.environments.trenv_config import *
-
-
-class TrenvxEnvironmentConfig(BaseModel):
-    """
-    Config for Trenvx Sandbox's create function parameters
-    NOTE: The API for the creation of sandbox does include hooks as well.
-    """
-
-    # Parameters for the creation of the template
-    image: str
-    """Docker image to pull"""
-    template_id: str
-    """Trenvx template id name."""
-    vcpu: int = 1
-    mem_mb: int = 2048
-    disk_mb: int = 4096
-    vmm_type: str = "firecracker"
-    kernel_version: str = "fc-6.1.134"
-    no_pull: bool = False
-    huge_pages: bool = False
-    overlay: bool = False
-    start_cmd: dict[str, str] | None = None
-    # Parameters for the creation of the sandbox
-    cwd: str | None = None
-    """Current working directory to use"""
-    target_addr: str = "127.0.0.1"
-    """IP address of where the trenvx backend is running."""
-    env: dict[str, str] = {}
-    """Environment variables to forward to container"""
-    timeout: float = 60
-    """Timeout for sandbox to initialize in seconds"""
-    metadata: dict[str, str] = {}
-    """Dictionary of strings that is stored alongside the running sandbox. Can be seen when one lists running sandboxes."""
-    connect_rpc: bool = True
-    """Whether connect rpc (SandboxRpc) or not"""
-    enable_diff_snapshot: bool = False
-    """Whether enable diff snapshot on sandbox"""
 
 
 class TrenvxEnvironment:
@@ -70,6 +32,9 @@ class TrenvxEnvironment:
     def _build_template(self):
         self.logger.info(f"Building the template {self.config.template_id} using the template-manager")
         config = load_trenvx_template()
+        if not self.config.always_rebuild and template_exists_and_matches(config["data_root"], self.config):
+            self.logger.info("Skipping rebuild!")
+            return
         config = add_trenvx_template(
             config=config,
             template_id=self.config.template_id,
