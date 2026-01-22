@@ -121,14 +121,12 @@ class TrenvxEnvironment:
         return {"output": result.stdout, "returncode": result.exit_code}
 
     def cleanup(self):
-        self.logger.info("Cleaning up")
         if not hasattr(self, "_ev_loop"):
             return
         if not hasattr(self, "ci"):
             return
         self._ev_loop.run_until_complete(self.ci.close())
         self._ev_loop.close()
-        self.logger.info("Cleaned up trenvx and evloop successfully")
 
     def __del__(self):
         # Prevent double close from Python's GC
