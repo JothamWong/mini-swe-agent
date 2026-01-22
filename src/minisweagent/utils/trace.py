@@ -30,11 +30,6 @@ class Span:
     def set_attribute(self, k: str, v: Any):
         self.attributes[k] = v
 
-    def __repr__(self):
-        indent = "\t" * (self.__get_depth())
-        attr_str = f" | {self.attributes}" if self.attributes else ""
-        return f"{indent}[{self.span_id}] {self.name} ({self.duration:.4f}s){attr_str}"
-
     def to_dict(self):
         return {
             "id": self.span_id,
@@ -45,9 +40,6 @@ class Span:
             "duration": self.duration,
             "attributes": self.attributes,
         }
-
-    def __get_depth(self) -> int:
-        return len([s for s in trace_stack.get() if s.span_id != self.span_id])
 
 
 @contextmanager
