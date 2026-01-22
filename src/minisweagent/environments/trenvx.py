@@ -5,6 +5,7 @@ from typing import Any
 from sandbox_sdk import Sandbox
 
 from minisweagent.environments.trenv_config import *
+from minisweagent.utils.trace import trace_span
 
 
 class TrenvxEnvironment:
@@ -22,7 +23,13 @@ class TrenvxEnvironment:
     to figure out...
     """
 
-    def __init__(self, *, config_class: type = TrenvxEnvironmentConfig, logger: logging.Logger | None = None, **kwargs):
+    def __init__(
+        self,
+        *,
+        config_class: type = TrenvxEnvironmentConfig,
+        logger: logging.Logger | None = None,
+        **kwargs,
+    ):
         self.logger = logger or logging.getLogger("minisweagent.environment")
         self.config = config_class(**kwargs)
         self._ev_loop = asyncio.new_event_loop()
@@ -30,9 +37,13 @@ class TrenvxEnvironment:
         self._setup_container()
 
     def _build_template(self):
-        self.logger.info(f"Building the template {self.config.template_id} using the template-manager")
+        self.logger.info(
+            f"Building the template {self.config.template_id} using the template-manager"
+        )
         config = load_trenvx_template()
-        if not self.config.always_rebuild and template_exists_and_matches(config["data_root"], self.config):
+        if not self.config.always_rebuild and template_exists_and_matches(
+            config["data_root"], self.config
+        ):
             self.logger.info("Skipping rebuild!")
             return
         config = add_trenvx_template(
@@ -49,39 +60,49 @@ class TrenvxEnvironment:
             overlay=self.config.overlay,
             start_cmd=self.config.start_cmd,
         )
-        config = change_target_template(config=config, template_id=self.config.template_id)
+        config = change_target_template(
+            config=config, template_id=self.config.template_id
+        )
         build_template(config, self.config.template_id)
         self.logger.info(f"Built the template {self.config.template_id}")
 
     def _setup_container(self):
-        self.logger.info(f"Setting up Trenvx sandbox with template {self.config.template_id}")
-        self.ci = self._ev_loop.run_until_complete(
-            Sandbox.create(
-                template=self.config.template_id,
-                cwd=self.config.cwd,
-                target_addr=self.config.target_addr,
-                env_vars=self.config.env,
-                timeout=self.config.timeout,
-                metadata=self.config.metadata,
-                connect_rpc=self.config.connect_rpc,
-                enable_diff_snapshot=self.config.enable_diff_snapshot,
-            )
+        self.logger.info(
+            f"Setting up Trenvx sandbox with template {self.config.template_id}"
         )
+        with trace_span("trenv-create-sandbox") as span:
+            span.set_attribute("template-id", self.config.template_id)
+            self.ci = self._ev_loop.run_until_complete(
+                Sandbox.create(
+                    template=self.config.template_id,
+                    cwd=self.config.cwd,
+                    target_addr=self.config.target_addr,
+                    env_vars=self.config.env,
+                    timeout=self.config.timeout,
+                    metadata=self.config.metadata,
+                    connect_rpc=self.config.connect_rpc,
+                    enable_diff_snapshot=self.config.enable_diff_snapshot,
+                )
+            )
         self.logger.info("Successfully set up Trenv sandbox")
 
     def get_template_vars(self) -> dict[str, Any]:
         return self.config.model_dump()
 
-    def execute(self, command: str, cwd: str = "", *, timeout: int | None = None) -> dict[str, Any]:
+    def execute(
+        self, command: str, cwd: str = "", *, timeout: int | None = None
+    ) -> dict[str, Any]:
         self.logger.info(f"Executing {command=} in {cwd=} with {timeout=}")
-        result = self._ev_loop.run_until_complete(
-            self.ci.process.start_and_wait(
-                cmd=command,
-                env_vars=self.config.env,
-                cwd=self.config.cwd,
-                timeout=self.config.timeout,
+        with trace_span("trenv-execute") as span:
+            span.set_attribute("cmd", command)
+            result = self._ev_loop.run_until_complete(
+                self.ci.process.start_and_wait(
+                    cmd=command,
+                    env_vars=self.config.env,
+                    cwd=self.config.cwd,
+                    timeout=self.config.timeout,
+                )
             )
-        )
 
         return {"output": result.stdout, "returncode": result.exit_code}
 

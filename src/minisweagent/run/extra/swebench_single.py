@@ -17,6 +17,7 @@ from minisweagent.run.extra.swebench import (
 )
 from minisweagent.run.utils.save import save_traj
 from minisweagent.utils.log import logger
+from minisweagent.utils.trace import trace_span, generate_report
 
 app = typer.Typer(add_completion=False)
 
@@ -66,7 +67,9 @@ def main(
 
     exit_status, result, extra_info = None, None, None
     try:
-        exit_status, result = agent.run(instance["problem_statement"])  # type: ignore[arg-type]
+        with trace_span("RootSpan"):
+            exit_status, result = agent.run(instance["problem_statement"])  # type: ignore[arg-type]
+        generate_report()
     except Exception as e:
         logger.error(f"Error processing instance {instance_spec}: {e}", exc_info=True)
         exit_status, result = type(e).__name__, str(e)

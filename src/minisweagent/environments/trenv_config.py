@@ -7,6 +7,9 @@ from pathlib import Path
 import subprocess
 from pydantic import BaseModel
 
+from minisweagent.utils.trace import trace_span
+
+
 DEFAULT_TRENV_CONFIG_FILENAME = "example_config.toml"
 DEFAULT_TRENV_TEMPLATE_MANAGER_BINARY = ""
 
@@ -117,18 +120,20 @@ def build_template(config: tomlkit.TOMLDocument, template_id: str):
         "--config",
         str(config_path),
     ]
-    try:
-        subprocess.run(
-            command,
-            cwd=working_dir,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to build the template: {e.returncode}")
-        print(e.stderr)
-        raise
+    with trace_span("trenvx-build-template") as trenv_template_span:
+        trenv_template_span.set_attribute("template_id", template_id)
+        try:
+            subprocess.run(
+                command,
+                cwd=working_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to build the template: {e.returncode}")
+            print(e.stderr)
+            raise
 
 
 def load_trenvx_template(file_path: str | None = None) -> tomlkit.TOMLDocument:
